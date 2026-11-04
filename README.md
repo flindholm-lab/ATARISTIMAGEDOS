@@ -76,23 +76,7 @@ Designed specifically for vintage PCs, DOSBox, and real-mode DOS environments wi
 ---
 
 ## Screen Layout
-
-```
- File   Image   View   Help                  STIMAGE for MS-DOS v2.1 
- DUCKTALE.ST [880K, 2S, 11T] Free: 48 KB (5%)
-+-- Directory: \ ------------------------------------+ +-- Disk & File Info ----+
-| Name          Size   Attr     Date   Time Clust    | | OEM:      .IBM         |
-|----------------------------------------------------| | Serial:   $A58578      |
-| CARLODUK.PRG 78,638           04-22 03:50   100    | | Capacity: 880 KB       |
-| CASTORS.PC1   7,348           04-22 03:51   177    | | Sides:    2            |
-| CASTORS.SND   7,048           04-22 03:51   185    | | Sec/Trk:  11           |
-| ...                                                | | Sec/Clust:2            |
-|                                                    | | Packer:   Pack-Ice PRG |
-|                                                    | | Sel:      18/96        |
-|                                                    | | Clust:    #100         |
-|                                                    | | Size:     78,638 B     |
-+----------------------------------------------------+ +------------------------+
-```
+<img width="641" height="298" alt="image" src="https://github.com/user-attachments/assets/e702ce89-89a4-4739-842f-aa5efc9f26f7" />
 
 ---
 
