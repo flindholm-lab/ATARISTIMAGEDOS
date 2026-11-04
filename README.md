@@ -120,3 +120,12 @@ STIMAGE for MS-DOS now natively supports **Magic Shadow Archiver (`.MSA`)** flop
 - **Clean Lifecycle**: Automatically cleans up temporary staging files on image close or exit.
 
 ---
+## Screenshots
+
+<img width="637" height="301" alt="image" src="https://github.com/user-attachments/assets/bf1433b3-50bb-4d8e-a293-ea0c54f25776" />
+<img width="637" height="301" alt="image" src="https://github.com/user-attachments/assets/bc772cc0-d5c8-43f2-aa3e-1be6b9e8f4d5" />
+<img width="637" height="297" alt="image" src="https://github.com/user-attachments/assets/1825ce39-3c7d-42ee-8f3f-4da62c3625b8" />
+<img width="637" height="298" alt="image" src="https://github.com/user-attachments/assets/b949d863-7c32-4d32-82fc-909c2daa764b" />
+
+
+
