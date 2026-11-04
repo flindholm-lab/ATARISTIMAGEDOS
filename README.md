@@ -1,6 +1,7 @@
 # STIMAGE for MS-DOS (v2.1)
 
 <img width="641" height="298" alt="image" src="https://github.com/user-attachments/assets/e702ce89-89a4-4739-842f-aa5efc9f26f7" />
+
 A 16-bit real-mode MS-DOS port of the Atari ST Floppy Disk Image Manager, built with **Borland Turbo Pascal 7.0**.
 
 Designed specifically for vintage PCs, DOSBox, and real-mode DOS environments without external dependencies.
