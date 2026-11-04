@@ -1,5 +1,6 @@
 # STIMAGE for MS-DOS (v2.1)
 
+<img width="641" height="298" alt="image" src="https://github.com/user-attachments/assets/e702ce89-89a4-4739-842f-aa5efc9f26f7" />
 A 16-bit real-mode MS-DOS port of the Atari ST Floppy Disk Image Manager, built with **Borland Turbo Pascal 7.0**.
 
 Designed specifically for vintage PCs, DOSBox, and real-mode DOS environments without external dependencies.
@@ -75,10 +76,6 @@ Designed specifically for vintage PCs, DOSBox, and real-mode DOS environments wi
 
 ---
 
-## Screen Layout
-<img width="641" height="298" alt="image" src="https://github.com/user-attachments/assets/e702ce89-89a4-4739-842f-aa5efc9f26f7" />
-
----
 
 ## Keyboard Controls & Shortcuts
 
@@ -122,25 +119,3 @@ STIMAGE for MS-DOS now natively supports **Magic Shadow Archiver (`.MSA`)** flop
 - **Clean Lifecycle**: Automatically cleans up temporary staging files on image close or exit.
 
 ---
-
-## Build & Run Instructions
-
-### 1. Build Executable
-```bash
-python3 build.py
-# or
-make
-```
-This cross-compiles both `STIMAGE.PAS` and `view.pas` using Borland Turbo Pascal 7.0 (`TPC.EXE`) inside DOSBox via the local staging pipeline, producing:
-- `STIMAGE.EXE` (34,528 bytes)
-- `VIEW.EXE` (21,552 bytes)
-
-### 2. Run Interactively on XRDP Desktop
-```bash
-# Launch without arguments (opens File Picker dialog):
-python3 run.py
-
-# Or launch directly with an Atari ST disk image:
-python3 run.py ducktale.st
-python3 run.py airball.st
-```
