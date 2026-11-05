@@ -1498,7 +1498,7 @@ begin
 
   if not CanRestore then
   begin
-    WriteStr(17, 13, 'Error: Original clusters have been overwritten!', ATTR_DIALOG_HL);
+    WriteStr(17, 13, 'Error: Original clusters were overwritten!', ATTR_DIALOG_HL);
     ReadKeyBIOS(Scan);
     RestoreArea(15, 8, 65, 14, Saved);
     Exit;
@@ -2663,6 +2663,209 @@ end;
 {   MODAL POPUPS (CLUSTER MAP, WRITE FLOPPY, BPB, HELP, ABOUT)              }
 {===========================================================================}
 
+procedure ShowClusterHexModal(var TargetClust: Word);
+var
+  Saved: PPopupSave;
+  ClustBuf: array[0..2047] of Byte;
+  ClustSize: Word;
+  ActualRead: Word;
+  ByteOff: LongInt;
+  PhysSec, SecsPerCyl, Cyl, Head, Sec: LongInt;
+  FatVal: Word;
+  OwnerName: TString12;
+  ChainPos, ChainLen: Integer;
+  IsSelOwner: Boolean;
+  ScrollRow, MaxScrollRow: Integer;
+  R, C, Offset: Integer;
+  B: Byte;
+  HexLine: string[60];
+  AscLine: string[20];
+  LineStr: string[80];
+  StatusStr: string[20];
+  NextStr: string[16];
+  Ch: Char;
+  Scan: Byte;
+  MX, MY: Integer;
+  DblClick: Boolean;
+  Event: Integer;
+  NeedReload: Boolean;
+begin
+  if (not ImageIsOpen) or (TargetClust < 2) or (TargetClust > Layout.TotalClusters + 1) then Exit;
+
+  Saved := SaveArea(2, 1, 77, 23);
+  ScrollRow := 0;
+  NeedReload := True;
+
+  repeat
+    if NeedReload then
+    begin
+      NeedReload := False;
+      ScrollRow := 0;
+
+      ClustSize := Layout.BytesPerCluster;
+      if ClustSize > SizeOf(ClustBuf) then ClustSize := SizeOf(ClustBuf);
+      if ClustSize < 512 then ClustSize := 512;
+
+      ByteOff := Layout.DataAreaStart + LongInt(TargetClust - 2) * Layout.BytesPerCluster;
+      PhysSec := ByteOff div 512;
+      SecsPerCyl := Layout.Sides * Layout.SectorsPerTrack;
+      if SecsPerCyl > 0 then
+      begin
+        Cyl := PhysSec div SecsPerCyl;
+        Head := (PhysSec mod SecsPerCyl) div Layout.SectorsPerTrack;
+        Sec := ((PhysSec mod SecsPerCyl) mod Layout.SectorsPerTrack) + 1;
+      end
+      else
+      begin
+        Cyl := 0; Head := 0; Sec := 0;
+      end;
+
+      FillChar(ClustBuf, SizeOf(ClustBuf), 0);
+      if IOResult <> 0 then ;
+      Seek(ActiveImageFile, ByteOff);
+      if IOResult = 0 then
+        BlockRead(ActiveImageFile, ClustBuf, ClustSize, ActualRead);
+      if IOResult <> 0 then ;
+
+      FatVal := FatGetEntry(TargetClust);
+      FindClusterOwner(TargetClust, OwnerName, ChainPos, ChainLen, IsSelOwner);
+
+      if FatVal = 0 then
+      begin
+        StatusStr := 'FREE';
+        NextStr := 'None';
+      end
+      else if FatVal = FAT12_ENTRY_BAD then
+      begin
+        StatusStr := 'BAD CLUSTER';
+        NextStr := 'N/A';
+      end
+      else if FatVal >= FAT12_ENTRY_EOC_MIN then
+      begin
+        if (ChainLen <= 1) and (ChainPos <= 1) then
+          StatusStr := 'SINGLE CLUST'
+        else
+          StatusStr := 'END OF CHAIN';
+        NextStr := 'EOF ($' + HexStrWord(FatVal) + ')';
+      end
+      else if ChainPos = 1 then
+      begin
+        StatusStr := 'START OF CHAIN';
+        NextStr := '#' + IntToStr(FatVal);
+      end
+      else
+      begin
+        StatusStr := 'MID-CHAIN';
+        NextStr := '#' + IntToStr(FatVal);
+      end;
+
+      MaxScrollRow := (ClustSize div 16) - 16;
+      if MaxScrollRow < 0 then MaxScrollRow := 0;
+    end;
+
+    MouseHide;
+    FillBox(2, 1, 77, 23, ' ', ATTR_DIALOG_BG);
+    DrawFrame(2, 1, 77, 23, ATTR_DIALOG_BD,
+      ' Cluster #' + IntToStr(TargetClust) + ' Hex Inspector (' + IntToStr(ClustSize) + ' B) ');
+
+    LineStr := 'Physical: Sector ' + FormatNum(PhysSec) + ' (Cyl ' + IntToStr(Cyl) +
+      ', Head ' + IntToStr(Head) + ', Sec ' + IntToStr(Sec) + ') | Offset: ' + FormatNum(ByteOff) + ' B';
+    WriteStr(4, 2, PadRight(Copy(LineStr, 1, 72), 72), ATTR_DIALOG_HL);
+
+    LineStr := 'Status: ' + PadRight(StatusStr, 14) + ' | Next: ' + PadRight(NextStr, 12);
+    if OwnerName <> '' then
+      LineStr := LineStr + ' | Owner: ' + OwnerName + ' (Clu ' + IntToStr(ChainPos) + '/' + IntToStr(ChainLen) + ')'
+    else if FatVal = 0 then
+      LineStr := LineStr + ' | Owner: [Free Space]'
+    else
+      LineStr := LineStr + ' | Owner: [Unlinked Data]';
+    WriteStr(4, 3, PadRight(Copy(LineStr, 1, 72), 72), ATTR_DIALOG_BG);
+
+    for R := 0 to 15 do
+    begin
+      Offset := (ScrollRow + R) * 16;
+      WriteStr(4, 4 + R, FormatHexDumpLine(Offset, @ClustBuf, ClustSize), ATTR_DIALOG_BG);
+    end;
+
+    LineStr := 'Pos: $' + HexStrWord(ScrollRow * 16) + '..' +
+      HexStrWord((ScrollRow + 16) * 16 - 1) + ' (' +
+      FormatNum(ScrollRow * 16) + '..' + FormatNum((ScrollRow + 16) * 16) + ' B)';
+    WriteStr(4, 20, PadRight(LineStr, 72), ATTR_DIALOG_BD);
+
+    WriteStr(4, 21,
+      '[Arrows] Scroll   [Tab] Follow Chain   [+/-] Next/Prev   [Esc] Close',
+      ATTR_STATUS);
+    MouseShow;
+
+    Event := GetInputEvent(Ch, Scan, MX, MY, DblClick);
+    if Event = EVENT_KEY then
+    begin
+      if (Ch = #27) or (UpCase(Ch) = 'Q') then Break;
+
+      case Scan of
+        KEY_UP:       if ScrollRow > 0 then Dec(ScrollRow);
+        KEY_DOWN:     if ScrollRow < MaxScrollRow then Inc(ScrollRow);
+        KEY_PAGEUP:   if ScrollRow >= 8 then Dec(ScrollRow, 8) else ScrollRow := 0;
+        KEY_PAGEDOWN: if ScrollRow + 8 <= MaxScrollRow then Inc(ScrollRow, 8) else ScrollRow := MaxScrollRow;
+        KEY_HOME:     ScrollRow := 0;
+        KEY_END:      ScrollRow := MaxScrollRow;
+      end;
+
+      if Ch = #9 then { Tab: follow chain }
+      begin
+        if (FatVal >= 2) and (FatVal <= Layout.TotalClusters + 1) then
+        begin
+          TargetClust := FatVal;
+          NeedReload := True;
+        end;
+      end
+      else if (Ch = '+') or (Scan = KEY_RIGHT) then
+      begin
+        if TargetClust < Layout.TotalClusters + 1 then
+        begin
+          Inc(TargetClust);
+          NeedReload := True;
+        end;
+      end
+      else if (Ch = '-') or (Scan = KEY_LEFT) then
+      begin
+        if TargetClust > 2 then
+        begin
+          Dec(TargetClust);
+          NeedReload := True;
+        end;
+      end;
+    end
+    else if Event = EVENT_CLICK then
+    begin
+      if (MX < 2) or (MX > 77) or (MY < 1) or (MY > 23) then
+        Break
+      else if (MY = 21) and (MX >= 60) and (MX <= 73) then
+        Break
+      else if (MY = 21) and (MX >= 21) and (MX <= 40) then
+      begin
+        if (FatVal >= 2) and (FatVal <= Layout.TotalClusters + 1) then
+        begin
+          TargetClust := FatVal;
+          NeedReload := True;
+        end;
+      end
+      else if (MY = 21) and (MX >= 42) and (MX <= 58) then
+      begin
+        if TargetClust < Layout.TotalClusters + 1 then
+        begin
+          Inc(TargetClust);
+          NeedReload := True;
+        end;
+      end;
+    end;
+  until False;
+
+  MouseHide;
+  RestoreArea(2, 1, 77, 23, Saved);
+  MouseShow;
+end;
+
 procedure ShowClusterMapModal;
 var
   Saved: PPopupSave;
@@ -2908,9 +3111,9 @@ begin
         ShowBootSectorHexModal;
       end;
 
-      if Ch = #13 then
+      if (Ch = #13) or (UpCase(Ch) = 'V') or (UpCase(Ch) = 'H') then
       begin
-        InteractiveFileViewer(True);
+        ShowClusterHexModal(CurClust);
       end;
     end
     else if Event = EVENT_CLICK then
@@ -2922,8 +3125,12 @@ begin
         begin
           CurClust := ClickedClust;
           if DblClick then
-            InteractiveFileViewer(True);
+            ShowClusterHexModal(CurClust);
         end;
+      end
+      else if (MY = 23) and (MX >= 17) and (MX <= 28) then
+      begin
+        ShowClusterHexModal(CurClust);
       end
       else if (MY = 23) and (MX >= 41) and (MX <= 64) then
       begin
@@ -3451,35 +3658,17 @@ begin
     for R := 0 to 15 do
     begin
       Offset := (ScrollRow + R) * 16;
-      HexLine := HexStrWord(Offset) + ': ';
-      AscLine := '';
-
-      for C := 0 to 15 do
-      begin
-        B := RawBootSector[Offset + C];
-        if C = 8 then HexLine := HexLine + '-'
-        else if C > 0 then HexLine := HexLine + ' ';
-        HexLine := HexLine + HexStrByte(B);
-
-        if (B >= 32) and (B <= 126) then
-          AscLine := AscLine + Chr(B)
-        else
-          AscLine := AscLine + '.';
-      end;
-
-      if (ScrollRow + R = 0) then
-        LineAttr := ATTR_DIALOG_HL
-      else if (ScrollRow + R = 31) then
+      if (ScrollRow + R = 0) or (ScrollRow + R = 31) then
         LineAttr := ATTR_DIALOG_HL
       else
         LineAttr := ATTR_DIALOG_BG;
 
-      WriteStr(4, 4 + R, HexLine + '  ' + AscLine, LineAttr);
+      WriteStr(4, 4 + R, FormatHexDumpLine(Offset, @RawBootSector, 512), LineAttr);
     end;
 
     WriteStr(4, 20, '$00: Branch  $02: OEM  $0B..$1D: BPB  $1E: Code  $1FE: Atari/PC Sum', ATTR_DIALOG_BD);
     WriteStr(4, 21, PadRight(StatusMsg, 70), ATTR_DIALOG_HL);
-    WriteStr(4, 22, '[Arrows] Scroll  [D] Disinf  [I] Immun  [K] PC-Boot  [S] Save  [Esc] Exit', ATTR_STATUS);
+    WriteStr(4, 22, '[Arrows] Scroll [D] Disinf [I] Immun [K] PC-Boot [S] Save [Esc] Exit', ATTR_STATUS);
     MouseShow;
 
     Event := GetInputEvent(Ch, Scan, MX, MY, DblClick);
@@ -3560,7 +3749,7 @@ begin
     end
     else if Event = EVENT_CLICK then
     begin
-      if (MY = 22) and (MX >= 70) then Break;
+      if (MY = 22) and (MX >= 60) then Break;
     end;
   until False;
 
@@ -3622,7 +3811,7 @@ begin
       else
         WriteStr(8, 8, 'Executable Boot: NO  (Standard Data / Non-Executable Disk)', ATTR_DIALOG_BG);
       WriteStr(8, 9, 'Signatures:  30 Atari ST Boot Viruses (Ghost, MAD, Signum, etc.)', ATTR_DIALOG_BG);
-      WriteStr(8, 10, 'Action:      [I] Immunize Disk (Install resident anti-virus guard)', ATTR_DIALOG_HL);
+      WriteStr(8, 10, 'Action:      [I] Immunize Disk (Install resident boot guard)', ATTR_DIALOG_HL);
     end;
 
     WriteStr(6, 12, '2. Executable Files Scanner (PRG / TOS / APP / ACC):', ATTR_DIALOG_HL);
@@ -3631,7 +3820,7 @@ begin
 
     WriteStr(6, 17, '------------------------------------------------------------------', ATTR_DIALOG_BD);
     WriteStr(6, 18, 'Options:  [F] Scan All Files  [D] Disinfect  [I] Immunize  [B] Hex', ATTR_DIALOG_BG);
-    WriteStr(6, 21, '[F] Scan Files   [D] Disinfect   [I] Immunize   [B] Hex   [Esc] Close', ATTR_STATUS);
+    WriteStr(6, 21, '[F] Scan Files  [D] Disinfect  [I] Immunize  [B] Hex  [Esc] Close', ATTR_STATUS);
     MouseShow;
 
     Event := GetInputEvent(Ch, Scan, MX, MY, DblClick);
@@ -3730,7 +3919,7 @@ begin
     end
     else if Event = EVENT_CLICK then
     begin
-      if (MY = 21) and (MX >= 65) then Break;
+      if (MY = 21) and (MX >= 58) then Break;
     end;
   until False;
 
@@ -3923,60 +4112,9 @@ begin
 end;
 
 procedure ShowCatalogModal;
-var
-  Saved: PPopupSave;
-  Ch: Char;
-  Scan: Byte;
-  DidExport: Boolean;
 begin
-  if (not ImageIsOpen) then Exit;
-
-  Saved := SaveArea(14, 7, 66, 17);
-  MouseHide;
-  FillBox(14, 7, 66, 17, ' ', ATTR_DIALOG_BG);
-  DrawFrame(14, 7, 66, 17, ATTR_DIALOG_BD, 'Export Disk Catalog');
-
-  WriteStr(17, 9,  'Export All Disk Files & Folders:', ATTR_DIALOG_BG);
-  WriteStr(17, 11, '[1] Text File (CATALOG.TXT)', ATTR_DIALOG_HL);
-  WriteStr(17, 12, '[2] CSV Spreadsheet (CATALOG.CSV)', ATTR_DIALOG_HL);
-  WriteStr(17, 13, '[3] Both Formats (TXT & CSV)', ATTR_DIALOG_HL);
-  WriteStr(17, 15, 'Select [1], [2], or [3] (or Esc): ', ATTR_STATUS);
-  MouseShow;
-
-  repeat
-    Ch := ReadKeyBIOS(Scan);
-    if Scan = KEY_F10 then Ch := #27;
-    if Ch = #27 then
-    begin
-      RestoreArea(14, 7, 66, 17, Saved);
-      Exit;
-    end;
-  until Ch in ['1', '2', '3'];
-
-  MouseHide;
-  DidExport := False;
-  if (Ch = '1') or (Ch = '3') then
-    DidExport := ExportCatalogFile(ActiveImageFile, Layout.DataAreaStart,
-      Layout.BytesPerCluster, Layout.RootDirStart, Layout.RootDirSectors,
-      BPB.SectorsPerCluster, Layout.TotalClusters, Layout.FreeClusters,
-      Layout.Tracks, BPB.Sides, BPB.SectorsPerTrack, Layout.TotalBytes,
-      Layout.FreeBytes, @FatBuf, ActiveImagePath, 'CATALOG.TXT', False);
-
-  if (Ch = '2') or (Ch = '3') then
-    DidExport := ExportCatalogFile(ActiveImageFile, Layout.DataAreaStart,
-      Layout.BytesPerCluster, Layout.RootDirStart, Layout.RootDirSectors,
-      BPB.SectorsPerCluster, Layout.TotalClusters, Layout.FreeClusters,
-      Layout.Tracks, BPB.Sides, BPB.SectorsPerTrack, Layout.TotalBytes,
-      Layout.FreeBytes, @FatBuf, ActiveImagePath, 'CATALOG.CSV', True);
-
-  if DidExport then
-    WriteStr(17, 15, 'Catalog exported successfully! Any key.', ATTR_DIALOG_HL)
-  else
-    WriteStr(17, 15, 'Error exporting catalog file! Any key. ', ATTR_DIALOG_HL);
-
-  MouseShow;
-  ReadKeyBIOS(Scan);
-  RestoreArea(14, 7, 66, 17, Saved);
+  if not ImageIsOpen then Exit;
+  RunCatalogExportDialog(ActiveImageFile, Layout, BPB, @FatBuf, ActiveImagePath);
 end;
 
 procedure ShowImportFileModal;
@@ -4345,7 +4483,7 @@ begin
 
   WriteStr(11, 6,  'This operation patches the Atari ST Boot Sector to allow', ATTR_DIALOG_BG);
   WriteStr(11, 7,  'standard MS-DOS and Windows PCs to read this floppy disk:', ATTR_DIALOG_BG);
-  WriteStr(11, 9,  '- Installs PC jump instruction ($EB $3C $90 / JMP SHORT $3C)', ATTR_DIALOG_HL);
+  WriteStr(11, 9,  '- Installs PC jump instruction ($EB $3C $90 / JMP SHORT)', ATTR_DIALOG_HL);
   WriteStr(11, 10, '- Sets standard DOS OEM ID: ''MSDOS5.0''', ATTR_DIALOG_HL);
   WriteStr(11, 11, '- Sets extended BPB ($29) with Volume Serial & Label', ATTR_DIALOG_HL);
   WriteStr(11, 12, '- Adds standard PC boot signature ($55 $AA) at sector tail', ATTR_DIALOG_HL);

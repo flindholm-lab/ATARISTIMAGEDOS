@@ -49,6 +49,8 @@ var
 
 procedure ScanHostDirectory(const Mask: string);
 function  ShowFileDialog(var SelectedFile: string): Boolean;
+function  RunCatalogExportDialog(var ImgF: file; const Layout: TDiskLayout;
+  const BPB: TAtariBPB; FatBuf: Pointer; const ImgPath: string): Boolean;
 
 implementation
 
@@ -371,6 +373,64 @@ begin
   RestoreArea(10, 2, 70, 22, Saved);
   MouseShow;
   ShowFileDialog := OkSelected;
+end;
+
+function RunCatalogExportDialog(var ImgF: file; const Layout: TDiskLayout;
+  const BPB: TAtariBPB; FatBuf: Pointer; const ImgPath: string): Boolean;
+var
+  Saved: PPopupSave;
+  Ch: Char;
+  Scan: Byte;
+  DidExport: Boolean;
+begin
+  RunCatalogExportDialog := False;
+  Saved := SaveArea(14, 7, 66, 17);
+  MouseHide;
+  FillBox(14, 7, 66, 17, ' ', ATTR_DIALOG_BG);
+  DrawFrame(14, 7, 66, 17, ATTR_DIALOG_BD, 'Export Disk Catalog');
+
+  WriteStr(17, 9,  'Export All Disk Files & Folders:', ATTR_DIALOG_BG);
+  WriteStr(17, 11, '[1] Text File (CATALOG.TXT)', ATTR_DIALOG_HL);
+  WriteStr(17, 12, '[2] CSV Spreadsheet (CATALOG.CSV)', ATTR_DIALOG_HL);
+  WriteStr(17, 13, '[3] Both Formats (TXT & CSV)', ATTR_DIALOG_HL);
+  WriteStr(17, 15, 'Select [1], [2], or [3] (or Esc): ', ATTR_NORMAL);
+  MouseShow;
+
+  repeat
+    Ch := ReadKeyBIOS(Scan);
+    if Scan = KEY_F10 then Ch := #27;
+    if Ch = #27 then
+    begin
+      RestoreArea(14, 7, 66, 17, Saved);
+      Exit;
+    end;
+  until Ch in ['1', '2', '3'];
+
+  MouseHide;
+  DidExport := False;
+  if (Ch = '1') or (Ch = '3') then
+    DidExport := ExportCatalogFile(ImgF, Layout.DataAreaStart,
+      Layout.BytesPerCluster, Layout.RootDirStart, Layout.RootDirSectors,
+      BPB.SectorsPerCluster, Layout.TotalClusters, Layout.FreeClusters,
+      Layout.Tracks, BPB.Sides, BPB.SectorsPerTrack, Layout.TotalBytes,
+      Layout.FreeBytes, FatBuf, ImgPath, 'CATALOG.TXT', False);
+
+  if (Ch = '2') or (Ch = '3') then
+    DidExport := ExportCatalogFile(ImgF, Layout.DataAreaStart,
+      Layout.BytesPerCluster, Layout.RootDirStart, Layout.RootDirSectors,
+      BPB.SectorsPerCluster, Layout.TotalClusters, Layout.FreeClusters,
+      Layout.Tracks, BPB.Sides, BPB.SectorsPerTrack, Layout.TotalBytes,
+      Layout.FreeBytes, FatBuf, ImgPath, 'CATALOG.CSV', True);
+
+  if DidExport then
+    WriteStr(17, 15, 'Catalog exported successfully! Any key.', ATTR_DIALOG_HL)
+  else
+    WriteStr(17, 15, 'Error exporting catalog file! Any key. ', ATTR_DIALOG_HL);
+
+  MouseShow;
+  ReadKeyBIOS(Scan);
+  RestoreArea(14, 7, 66, 17, Saved);
+  RunCatalogExportDialog := DidExport;
 end;
 
 end.

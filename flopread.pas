@@ -118,12 +118,12 @@ begin
     if DriveNum = 0 then DriveLetter := 'A' else DriveLetter := 'B';
 
     WriteStr(9, 7, 'Source Drive:  [< Drive ' + DriveLetter + ': (3.5") >]  (A/B, Arrows, Click)', ATTR_DIALOG_HL);
-    WriteStr(9, 9, 'Output Image:  ' + OutName + '                                        ', ATTR_DIALOG_BG);
-    WriteStr(55, 9, '(N = edit)', ATTR_DIALOG_BG);
+    WriteStr(9, 9, 'Output Image:  ' + PadRight(OutName, 28), ATTR_DIALOG_BG);
+    WriteStr(54, 9, '(N = edit)', ATTR_DIALOG_BG);
     if Fit720 then
-      WriteStr(9, 11, 'Fit in 720K:   [< YES >]  (repack if larger than 720 KB, R/Click)  ', ATTR_DIALOG_OK)
+      WriteStr(9, 11, 'Fit in 720K:   [< YES >]  (repack if >720 KB, R/Click)      ', ATTR_DIALOG_OK)
     else
-      WriteStr(9, 11, 'Fit in 720K:   [< NO  >]  (keep disk as-is, R/Click)               ', ATTR_DIALOG_BG);
+      WriteStr(9, 11, 'Fit in 720K:   [< NO  >]  (keep disk as-is, R/Click)        ', ATTR_DIALOG_BG);
     WriteStr(9, 13, 'Insert the diskette to read. Geometry is detected from the boot', ATTR_DIALOG_BG);
     WriteStr(9, 14, 'sector (BPB). Unreadable sectors are zero-filled and reported.', ATTR_DIALOG_BG);
     if ActiveBtn = 0 then

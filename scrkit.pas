@@ -18,6 +18,8 @@ const
 type
   PPopupSave = ^TPopupSave;
   TPopupSave = array[0..1999] of Word;
+  PByteArray = ^TByteArray;
+  TByteArray = array[0..32767] of Byte;
 
 var
   { Direct VRAM access at $B800:0000 (Color Text Mode 80x25) }
@@ -54,6 +56,7 @@ procedure PromptInput(X, Y: Integer; var S: string; MaxLen: Integer);
 procedure SafeExec(const Prog, Params: string);
 procedure ShowHelpModal;
 procedure ShowAboutModal;
+function  FormatHexDumpLine(Offset: Word; P: Pointer; BufLen: Word): string;
 
 implementation
 
@@ -433,9 +436,9 @@ begin
   WriteStr(11, 15, 'Z : Extract All as ZIP                P : Depack & Extract', $1F);
 
   WriteStr(9, 17, 'Disk Tools & Viewers:', $74);
-  WriteStr(11, 18, 'F : Search Files (Wildcards)          X : Export Catalog (TXT/CSV)', $1F);
-  WriteStr(11, 19, 'B : Boot Sector Hex                   S : Virus Scanner', $1F);
-  WriteStr(11, 20, 'M / F6 : Visual Cluster Map           V / Enter : File Viewer', $1F);
+  WriteStr(11, 18, 'F : Search Files (Wildcards)   X : Export Catalog (TXT/CSV)', $1F);
+  WriteStr(11, 19, 'B : Boot Sector Hex            S : Virus Scanner', $1F);
+  WriteStr(11, 20, 'M / F6 : Visual Cluster Map    V / Enter : File Viewer', $1F);
 
   WriteStr(24, 21, 'Press any key to close help...', $74);
   ReadKeyBIOS(Scan);
@@ -460,6 +463,46 @@ begin
   WriteStr(24, 16, 'Press any key to return...', $74);
   ReadKeyBIOS(Scan);
   RestoreArea(15, 6, 65, 18, Saved);
+end;
+
+function FormatHexDumpLine(Offset: Word; P: Pointer; BufLen: Word): string;
+const
+  HexChars: array[0..15] of Char = '0123456789ABCDEF';
+var
+  BA: PByteArray;
+  HexPart: string[55];
+  AscPart: string[20];
+  C: Integer;
+  B: Byte;
+begin
+  BA := P;
+  HexPart := HexChars[(Offset shr 12) and 15] +
+             HexChars[(Offset shr 8) and 15] +
+             HexChars[(Offset shr 4) and 15] +
+             HexChars[Offset and 15] + ': ';
+  AscPart := '';
+  for C := 0 to 15 do
+  begin
+    if Offset + C < BufLen then
+    begin
+      B := BA^[Offset + C];
+      if C = 8 then HexPart := HexPart + '-'
+      else if C > 0 then HexPart := HexPart + ' ';
+      HexPart := HexPart + HexChars[B shr 4] + HexChars[B and 15];
+      if (B >= 32) and (B <= 126) then
+        AscPart := AscPart + Chr(B)
+      else
+        AscPart := AscPart + '.';
+    end
+    else
+    begin
+      if C = 8 then HexPart := HexPart + ' '
+      else if C > 0 then HexPart := HexPart + ' ';
+      HexPart := HexPart + '  ';
+      AscPart := AscPart + ' ';
+    end;
+  end;
+  FormatHexDumpLine := HexPart + '  ' + AscPart;
 end;
 
 end.
